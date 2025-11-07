@@ -1,0 +1,48 @@
+{
+  "manifest_version": 2,
+  "name": "WebRace Detector Suite (H2/H3SPA & ToCTOU)",
+  "version": "2.4.0",
+  "description": "A robust suite with smart WAF/DoS differentiation, utilizing multi-threading and timing analysis to detect race conditions and HTTP/2/3 vulnerabilities.",
+  "icons": {
+    "48": "icons/icon48.png"
+  },
+  
+  "background": {
+    "scripts": ["background.js"],
+    "persistent": false
+  },
+
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "webrace-detector-suite@example.com"
+    }
+  },
+
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.js"],
+      "run_at": "document_end"
+    }
+  ],
+  
+  "browser_action": {
+    "default_popup": "popup/ui.html",
+    "default_icon": "icons/icon48.png"
+  },
+  
+  "permissions": [
+    "webRequest",
+    "webRequestBlocking",
+    "webRequestAuthProvider",
+    "tabs",
+    "storage",
+    "downloads",
+    "http://*/*",
+    "https://*/*"
+  ],
+  
+  "web_accessible_resources": [
+    "workers/simulator.js"
+  ]
+}

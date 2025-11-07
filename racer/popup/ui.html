@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>WebRace Detector Suite</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <h2>WebRace Detector Suite v2.4 (MV2)</h2>
+  
+  <div class="settings-container">
+    <label class="switch-label" for="auth-scan-toggle">
+        Authenticated Scan Mode (Include Cookies)
+        <span class="warning">⚠️ Use with caution. Reload page after changing.</span>
+    </label>
+    <label class="switch">
+      <input type="checkbox" id="auth-scan-toggle">
+      <span class="slider round"></span>
+    </label>
+  </div>
+
+  <div id="status">Loading...</div>
+  <div id="findings-container"></div>
+  <button id="export-btn">Export Session Report (JSON)</button>
+  <div id="feature-status">
+      Advanced TLS Inspection: <span id="tls-status-indicator">Checking...</span>
+  </div>
+  <script src="ui.js"></script>
+</body>
+</html>
