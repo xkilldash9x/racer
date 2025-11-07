@@ -6,19 +6,50 @@ document.addEventListener('DOMContentLoaded', () => {
     const exportBtn = document.getElementById('export-btn');
     const authScanToggle = document.getElementById('auth-scan-toggle');
     const tlsStatusIndicator = document.getElementById('tls-status-indicator');
+    const masterToggle = document.getElementById('master-toggle');
 
     // --- Settings Management (MV2 Compatible - Callbacks) ---
 
     // Load settings (using chrome.storage.local)
-    chrome.storage.local.get("authScanMode", (settings) => {
+    chrome.storage.local.get(["authScanMode", "masterSwitch"], (settings) => {
         if (chrome.runtime.lastError) {
             console.error("Error loading settings:", chrome.runtime.lastError);
             return;
         }
+        // Default master switch to ON if not set
+        masterToggle.checked = settings.masterSwitch !== false;
         authScanToggle.checked = settings.authScanMode === true;
+
+        // Disable auth toggle if master is off
+        authScanToggle.disabled = !masterToggle.checked;
     });
 
-    // Save settings when changed
+    // Save master switch state
+    masterToggle.addEventListener('change', () => {
+        const isEnabled = masterToggle.checked;
+        authScanToggle.disabled = !isEnabled;
+
+        if (!isEnabled) {
+            const confirmed = confirm(
+                "Disabling the master switch will turn off ALL extension features, including passive TLS/Header checks and active scans.\n\n" +
+                "The extension will be completely inactive until re-enabled.\n\n" +
+                "Are you sure you want to proceed?"
+            );
+            if (!confirmed) {
+                masterToggle.checked = true;
+                authScanToggle.disabled = false;
+                return;
+            }
+        }
+
+        chrome.storage.local.set({ masterSwitch: isEnabled }, () => {
+            // Notify the background script to re-initialize listeners
+            chrome.runtime.sendMessage({ type: "MASTER_SWITCH_CHANGED" });
+        });
+    });
+
+
+    // Save auth scan settings when changed
     authScanToggle.addEventListener('change', () => {
         const isEnabled = authScanToggle.checked;
         if (isEnabled) {

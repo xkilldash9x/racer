@@ -1,6 +1,6 @@
 // background.js
 
-console.log("WebRace Detector Suite Background Script Initialized (v2.4.0 - MV2).");
+console.log("WebRace Detector Suite Background Script Initialized (v2.5.0 - MV2).");
 
 // --- Configuration & Constants ---
 const WAF_BODY_SIGNATURES = ['rate limited', 'access denied', 'cloudflare', 'sucuri', 'akamai', 'imperva', 'incapsula', 'security check', 'are you a human', 'bot protection', 'ddos protection', 'forbidden', 'too many requests', 'ray id', 'aws waf', 'wordfence', 'mod_security'];
@@ -189,6 +189,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         const advancedTlsAvailable = !!chrome.webRequest.getSecurityInfo;
         sendResponse({ ADVANCED_TLS: advancedTlsAvailable });
         return true;
+    } else if (message.type === "MASTER_SWITCH_CHANGED") {
+        initializeListeners();
+        return false;
     }
 });
 
@@ -445,19 +448,44 @@ const exportLogs = async () => {
     }
 };
 
-try {
-    if (chrome.webRequest) {
-        // MV2 requires 'blocking' to inspect headers reliably.
-        chrome.webRequest.onHeadersReceived.addListener(
-            responseListener,
-            { urls: ["<all_urls>"], types: ["main_frame"] },
-            ["responseHeaders", "blocking"]
-        );
-        console.log("webRequest listeners attached.");
+
+// --- Listener Management ---
+
+function removeWebRequestListeners() {
+    if (chrome.webRequest && chrome.webRequest.onHeadersReceived.hasListener(responseListener)) {
+        chrome.webRequest.onHeadersReceived.removeListener(responseListener);
+        console.log("Passive webRequest listeners removed.");
     }
-} catch (error) {
-    console.error("Failed to attach webRequest listeners:", error);
 }
+
+async function initializeListeners() {
+    // Always remove listeners first to prevent duplicates
+    removeWebRequestListeners();
+
+    try {
+        const settings = await getStorageData("masterSwitch");
+        // Default to ON if the setting is not present
+        if (settings.masterSwitch === false) {
+            console.log("Master switch is OFF. All listeners disabled.");
+            return;
+        }
+
+        if (chrome.webRequest) {
+            chrome.webRequest.onHeadersReceived.addListener(
+                responseListener,
+                { urls: ["<all_urls>"], types: ["main_frame"] },
+                ["responseHeaders", "blocking"]
+            );
+            console.log("Passive webRequest listeners attached.");
+        }
+    } catch (error) {
+        console.error("Failed to initialize listeners:", error);
+    }
+}
+
+// Initialize on startup
+initializeListeners();
+
 
 // Clear findings on navigation
 chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {

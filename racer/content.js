@@ -1,10 +1,10 @@
 // content.js
 
-console.log("WebRace Detector Suite Content Script Active.");
+console.log("WebRace Detector Suite Content Script Active (v2.5).");
 
 // MV2 Promise Wrapper for Storage API (required for async/await usage)
-const getStorageLocal = (key) => new Promise((resolve, reject) => {
-    chrome.storage.local.get(key, (result) => {
+const getStorageLocal = (keys) => new Promise((resolve, reject) => {
+    chrome.storage.local.get(keys, (result) => {
         if (chrome.runtime.lastError) {
             reject(chrome.runtime.lastError);
         } else {
@@ -14,7 +14,14 @@ const getStorageLocal = (key) => new Promise((resolve, reject) => {
 });
 
 const initiateActiveScan = async () => {
-    // 1. Determine the Protocol
+    // 1. Check Master Switch
+    const settings = await getStorageLocal(["masterSwitch", "authScanMode"]);
+    if (settings.masterSwitch === false) { // Explicitly check for false
+        console.log("Master switch is disabled. Skipping active scans.");
+        return;
+    }
+
+    // 2. Determine the Protocol
     let protocol = "unknown";
     try {
         const navigationEntry = performance.getEntriesByType("navigation")[0];
@@ -27,15 +34,8 @@ const initiateActiveScan = async () => {
 
     const targetUrl = window.location.href;
 
-    // 2. Get Configuration (Authenticated Scan Mode)
-    let authScanModeEnabled = false;
-    try {
-        // Use the wrapper function
-        const settings = await getStorageLocal("authScanMode");
-        authScanModeEnabled = settings.authScanMode === true;
-    } catch (error) {
-        console.error("Error retrieving settings:", error);
-    }
+    // 3. Get Configuration (Authenticated Scan Mode)
+    const authScanModeEnabled = settings.authScanMode === true;
     
     const authModeString = authScanModeEnabled ? 'include' : 'omit';
     console.log(`[Active Scan] Initiating scan for: ${targetUrl} (Protocol: ${protocol}, AuthMode: ${authModeString})`);
