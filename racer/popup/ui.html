@@ -5,9 +5,19 @@
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <h2>WebRace Detector Suite v2.4 (MV2)</h2>
-  
+  <h2>WebRace Detector Suite v2.5 (MV2)</h2>
+
   <div class="settings-container">
+    <label class="switch-label" for="master-toggle">
+      <b>Master Switch (Enable/Disable All Scans)</b>
+    </label>
+    <label class="switch">
+      <input type="checkbox" id="master-toggle">
+      <span class="slider round"></span>
+    </label>
+
+    <hr>
+
     <label class="switch-label" for="auth-scan-toggle">
         Authenticated Scan Mode (Include Cookies)
         <span class="warning">⚠️ Use with caution. Reload page after changing.</span>
