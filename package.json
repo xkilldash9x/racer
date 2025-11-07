@@ -1,0 +1,25 @@
+{
+  "name": "app",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "jest"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/xkilldash9x/racer.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/xkilldash9x/racer/issues"
+  },
+  "homepage": "https://github.com/xkilldash9x/racer#readme",
+  "devDependencies": {
+    "jest": "^27.5.1",
+    "jest-chrome": "^0.8.0"
+  }
+}

@@ -5,78 +5,7 @@ console.log("WebRace Detector Suite Background Script Initialized (v2.4.0 - MV2)
 // --- Configuration & Constants ---
 const WAF_BODY_SIGNATURES = ['rate limited', 'access denied', 'cloudflare', 'sucuri', 'akamai', 'imperva', 'incapsula', 'security check', 'are you a human', 'bot protection', 'ddos protection', 'forbidden', 'too many requests', 'ray id', 'aws waf', 'wordfence', 'mod_security'];
 
-// Initialize Storage (MV2 Persistence)
-// In MV2, chrome.storage.local is used as chrome.storage.session is generally unavailable.
-const storage = chrome.storage.local;
-const FINDINGS_KEY = "WebRaceFindings";
-
-// --- MV2 Promise Wrappers for Storage API ---
-// Allows us to keep using async/await even with MV2 callback APIs.
-const getStorageData = (key) => new Promise((resolve, reject) => {
-    storage.get(key, (data) => {
-        if (chrome.runtime.lastError) {
-            reject(chrome.runtime.lastError);
-        } else {
-            resolve(data);
-        }
-    });
-});
-
-const setStorageData = (data) => new Promise((resolve, reject) => {
-    storage.set(data, () => {
-        if (chrome.runtime.lastError) {
-            reject(chrome.runtime.lastError);
-        } else {
-            resolve();
-        }
-    });
-});
-
-// Initialize storage structure on startup
-getStorageData(FINDINGS_KEY).then(data => {
-    if (!data || !data[FINDINGS_KEY]) {
-        setStorageData({ [FINDINGS_KEY]: {} });
-    }
-}).catch(err => console.error("Storage initialization error:", err));
-
-
-// Centralized Logging Function
-const logFinding = async (tabId, finding) => {
-  if (tabId < 0) return;
-
-  if (!finding.timestamp) {
-      finding.timestamp = new Date().toISOString();
-  }
-
-  try {
-      const data = await getStorageData(FINDINGS_KEY);
-      const findings = (data && data[FINDINGS_KEY]) || {};
-
-      if (!findings[tabId]) {
-        findings[tabId] = [];
-      }
-      
-      // Simple deduplication for passive findings
-      if (finding.type.startsWith("SECURITY_HEADER_") || finding.type.startsWith("TLS_CONFIGURATION_")) {
-        const findingHash = `${finding.type}-${finding.url}`;
-        if (findings[tabId].some(f => `${f.type}-${f.url}` === findingHash)) {
-            return;
-        }
-      }
-
-      findings[tabId].push(finding);
-      await setStorageData({ [FINDINGS_KEY]: findings });
-
-      console.log(`[Finding Tab ${tabId}]:`, finding);
-      // Handle potential error if popup is closed in MV2
-      chrome.runtime.sendMessage({ type: "NEW_FINDING" }, () => {
-          if (chrome.runtime.lastError) {} 
-      });
-
-  } catch (error) {
-      console.error("Error logging finding:", error);
-  }
-};
+const { logFinding, getStorageData, FINDINGS_KEY, setStorageData } = require('./logging');
 
 // 1. Passive Observation: TLS and Security Headers
 const responseListener = async (details) => {
@@ -215,13 +144,13 @@ function analyzeWafVsDos(failedRequests) {
     if (totalFailures === 0) return { isWaf: false, isDos: false, avgWafScore: 0, evidence: "" };
 
     // 1. Consistency Check (Hashing)
-    const validHashes = failedRequests.map(r => r.hash).filter(h => h !== null);
+    const validHashes = failedRequests.map(r => r.hash).filter(h => h != null);
     const uniqueFailureHashes = new Set(validHashes);
     
     if (validHashes.length > 3 && uniqueFailureHashes.size === 1) {
         wafScore += 4 * totalFailures; 
         evidence.add("Consistent response body (Hash).");
-    } else if (uniqueFailureHashes.size > 1 && uniqueFailureHashes.size < totalFailures * 0.3) {
+    } else if (validHashes.length > 0 && uniqueFailureHashes.size > 1 && uniqueFailureHashes.size < totalFailures * 0.3) {
         wafScore += 1 * totalFailures;
         evidence.add("High response body consistency.");
     }
@@ -474,3 +403,11 @@ chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
         }
     }
 });
+
+module.exports = {
+    analyzeWafVsDos,
+    WAF_BODY_SIGNATURES,
+    analyzeHspaResults,
+    analyzeToctouResults,
+    analyzeSecurityHeaders
+};
