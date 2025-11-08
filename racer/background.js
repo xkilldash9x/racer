@@ -144,7 +144,9 @@ function analyzeWafVsDos(failedRequests) {
     const totalFailures = failedRequests.length;
     const evidence = new Set();
 
-    if (totalFailures === 0) return { isWaf: false, isDos: false, avgWafScore: 0, evidence: "" };
+    if (totalFailures === 0) {
+        return { isWaf: false, isDos: false, avgWafScore: 0, evidence: "" };
+    }
 
     // 1. Consistency Check (Hashing)
     const validHashes = failedRequests.map(r => r.hash).filter(h => h != null);
@@ -217,7 +219,7 @@ function analyzeWafVsDos(failedRequests) {
     const isWaf = avgWafScore > 2.0; 
 
     const dosIndicatorCount = dosIndicators.timeouts + dosIndicators.serverErrors + dosIndicators.connectionResets;
-    const isDos = !isWaf && (dosIndicatorCount / totalFailures > 0.7);
+    const isDos = !isWaf && totalFailures > 0 && (dosIndicatorCount / totalFailures > 0.7);
 
     return { isWaf, isDos, avgWafScore, dosIndicators, evidence: Array.from(evidence).join(' ') };
 }
