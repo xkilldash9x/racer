@@ -14,15 +14,23 @@ const getStorageData = (key) => new Promise((resolve, reject) => {
     });
 });
 
-const setStorageData = (data) => new Promise((resolve, reject) => {
-    storage.set(data, () => {
-        if (chrome.runtime.lastError) {
-            reject(chrome.runtime.lastError);
-        } else {
-            resolve();
-        }
+let storageLock = Promise.resolve();
+
+const setStorageData = (data) => {
+    const newLock = new Promise((resolve, reject) => {
+        storageLock.finally(() => {
+            storage.set(data, () => {
+                if (chrome.runtime.lastError) {
+                    reject(chrome.runtime.lastError);
+                } else {
+                    resolve();
+                }
+            });
+        });
     });
-});
+    storageLock = newLock;
+    return newLock;
+};
 
 // Initialize storage structure on startup
 getStorageData(FINDINGS_KEY).then(data => {
