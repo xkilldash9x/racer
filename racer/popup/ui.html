@@ -8,24 +8,106 @@
   <h2>WebRace Detector Suite v2.5 (MV2)</h2>
 
   <div class="settings-container">
-    <label class="switch-label" for="master-toggle">
-      <b>Master Switch (Enable/Disable All Scans)</b>
-    </label>
-    <label class="switch">
-      <input type="checkbox" id="master-toggle">
-      <span class="slider round"></span>
-    </label>
+    <div class="switch-row">
+        <label class="switch-label" for="master-toggle">
+        <b>Master Switch (Enable/Disable All Scans)</b>
+        </label>
+        <label class="switch">
+        <input type="checkbox" id="master-toggle">
+        <span class="slider round"></span>
+        </label>
+    </div>
 
     <hr>
 
-    <label class="switch-label" for="auth-scan-toggle">
-        Authenticated Scan Mode (Include Cookies)
-        <span class="warning">⚠️ Use with caution. Reload page after changing.</span>
-    </label>
-    <label class="switch">
-      <input type="checkbox" id="auth-scan-toggle">
-      <span class="slider round"></span>
-    </label>
+    <div class="switch-row">
+        <label class="switch-label" for="auth-scan-toggle">
+            Authenticated Scan Mode (Include Cookies)
+            <span class="warning">⚠️ Use with caution. Reload page after changing.</span>
+        </label>
+        <label class="switch">
+        <input type="checkbox" id="auth-scan-toggle">
+        <span class="slider round"></span>
+        </label>
+    </div>
+
+    <hr>
+
+    <div class="manual-controls">
+        <h3>Scan Configuration</h3>
+
+        <div class="switch-row">
+            <label class="switch-label" for="auto-start-toggle">
+                Auto-Start on Page Load
+            </label>
+            <label class="switch">
+                <input type="checkbox" id="auto-start-toggle" checked>
+                <span class="slider round"></span>
+            </label>
+        </div>
+
+        <div class="input-group">
+            <label for="concurrency-input">Concurrency:</label>
+            <input type="number" id="concurrency-input" value="15" min="1" max="200">
+        </div>
+
+        <div class="input-group">
+            <label for="delay-input">Request Delay (ms):</label>
+            <input type="number" id="delay-input" value="0" min="0" max="1000">
+        </div>
+
+        <div class="input-group">
+            <label for="custom-payload-input">Custom Payload (Optional):</label>
+            <textarea id="custom-payload-input" rows="2" placeholder="JSON or Text body..." style="width: 100%;"></textarea>
+        </div>
+
+        <button id="start-scan-btn">Start Manual Scan</button>
+    </div>
+
+    <hr>
+
+    <div class="server-mode">
+        <h3>Server Mode (Mock Responses)</h3>
+        <div class="switch-row">
+            <label class="switch-label" for="server-mode-toggle">
+                Enable Mock Server
+            </label>
+            <label class="switch">
+                <input type="checkbox" id="server-mode-toggle">
+                <span class="slider round"></span>
+            </label>
+        </div>
+
+        <div id="mock-controls" style="display:none; margin-top: 10px;">
+            <div class="input-group">
+                <label for="mock-url">URL Pattern:</label>
+                <input type="text" id="mock-url" placeholder="e.g. *example.com/api*">
+            </div>
+            <div class="input-group">
+                <label for="mock-type">Content-Type:</label>
+                <select id="mock-type">
+                    <option value="application/json">JSON</option>
+                    <option value="text/plain">Text</option>
+                    <option value="text/html">HTML</option>
+                </select>
+            </div>
+            <div class="input-group">
+                <label for="mock-body">Response Body:</label>
+                <textarea id="mock-body" rows="3" style="width: 100%;"></textarea>
+            </div>
+            <button id="add-rule-btn">Add Mock Rule</button>
+
+            <div id="rules-list"></div>
+        </div>
+    </div>
+
+    <hr>
+
+    <div class="traffic-monitor">
+        <h3>Traffic Monitor (Last 20)</h3>
+        <button id="refresh-traffic-btn">Refresh Traffic</button>
+        <div id="traffic-list" class="traffic-container"></div>
+    </div>
   </div>
 
   <div id="status">Loading...</div>
