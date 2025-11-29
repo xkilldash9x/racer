@@ -67,19 +67,37 @@ const runScan = async (testType, config) => {
     const startTime = performance.now();
     const requests = [];
 
+    const delay = config.delay || 0;
+
     for (let i = 0; i < config.concurrency; i++) {
+        if (delay > 0 && i > 0) {
+            await new Promise(resolve => setTimeout(resolve, delay));
+        }
+
         // Cache busting
         const scanUrl = new URL(config.url);
         scanUrl.searchParams.append(`_webrace_probe_${testType}`, `${i}_${Date.now()}`);
 
         const requestStartTime = performance.now();
 
+        // Handle Custom Body (Payload Replay)
+        let fetchOptions = {
+            method: config.method,
+            cache: 'no-store',
+            credentials: credentialsMode
+        };
+
+        if (config.customBody) {
+            fetchOptions.method = 'POST'; // Default to POST if body is present
+            fetchOptions.body = config.customBody;
+            // Add JSON content type if it looks like JSON?
+            // For now, let's keep it simple or allow headers injection later.
+            // If the user wants to replay a GET with body (non-standard but possible), we might need more config.
+            // But usually payload = POST.
+        }
+
         requests.push(
-            robustFetch(scanUrl.toString(), {
-                method: config.method,
-                cache: 'no-store',
-                credentials: credentialsMode
-            }).then(async response => {
+            robustFetch(scanUrl.toString(), fetchOptions).then(async response => {
                 const requestEndTime = performance.now();
                 let hash = null;
                 let bodySnippet = null;
