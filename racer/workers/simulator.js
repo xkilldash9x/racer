@@ -257,6 +257,7 @@ function handleError(error, requestStartTime, i) {
     };
 }
 
+const processResults = (testType, config, results, duration, authMode) => {
     const successCount = results.filter(r => r.ok).length;
     const failureCount = results.length - successCount;
     // Use all timings initially; background script filters successful ones if needed.
