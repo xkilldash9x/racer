@@ -121,6 +121,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     } else if (message.type === "MASTER_SWITCH_CHANGED") {
         initializeListeners();
         return false;
+    } else if (message.type === "GET_TRAFFIC_LOG") {
+        sendResponse(trafficLog);
+        return false; // synchronous response
     }
 });
 
@@ -408,15 +411,177 @@ async function initializeListeners() {
                 ["responseHeaders", "blocking"]
             );
             console.log("Passive webRequest listeners attached.");
+
+            // Initialize Mock Listener if Server Mode is enabled
+            initializeMockListener();
+
+            // Initialize Traffic Monitor
+            initializeTrafficListener();
         }
     } catch (error) {
         console.error("Failed to initialize listeners:", error);
     }
 }
 
+// --- Mock / Server Mode Logic ---
+
+let mockRules = [];
+let serverModeEnabled = false;
+
+async function loadMockSettings() {
+    try {
+        const data = await getStorageData(["serverMode", "mockRules"]);
+        serverModeEnabled = data.serverMode === true;
+        mockRules = data.mockRules || [];
+    } catch (e) {
+        console.error("Error loading mock settings", e);
+    }
+}
+
+// Initial load
+loadMockSettings();
+
+// Listen for updates from Popup
+chrome.runtime.onMessage.addListener((message) => {
+    if (message.type === "SERVER_MODE_CHANGED") {
+        serverModeEnabled = message.enabled;
+        initializeMockListener();
+    } else if (message.type === "MOCK_RULES_UPDATED") {
+        loadMockSettings();
+    }
+});
+
+const mockRequestListener = (details) => {
+    if (!serverModeEnabled || mockRules.length === 0) return;
+
+    for (const rule of mockRules) {
+        // Simple wildcard matching (convert glob to regex)
+        try {
+            // Correct wildcard handling: escape everything EXCEPT the * which we treat as .*
+            // We split by * first, escape each part, then join with .*
+            const parts = rule.urlPattern.split('*');
+            const escapedParts = parts.map(part => part.replace(/[.+?^${}()|[\]\\]/g, '\\$&'));
+            const regexPattern = escapedParts.join('.*');
+            const regex = new RegExp(`^${regexPattern}$`);
+
+            if (regex.test(details.url)) {
+                console.log(`[Mock Server] Intercepting ${details.url} with rule: ${rule.urlPattern}`);
+
+                // Construct Data URI (with Unicode support)
+                const contentType = rule.contentType || 'text/plain';
+                const safeBody = unescape(encodeURIComponent(rule.body || ''));
+                const bodyBase64 = btoa(safeBody);
+                const dataUri = `data:${contentType};base64,${bodyBase64}`;
+
+                return { redirectUrl: dataUri };
+            }
+        } catch (e) {
+            console.error("Error matching mock rule:", e);
+        }
+    }
+};
+
+function initializeMockListener() {
+    if (chrome.webRequest && chrome.webRequest.onBeforeRequest) {
+        if (chrome.webRequest.onBeforeRequest.hasListener(mockRequestListener)) {
+            chrome.webRequest.onBeforeRequest.removeListener(mockRequestListener);
+        }
+
+        if (serverModeEnabled) {
+             chrome.webRequest.onBeforeRequest.addListener(
+                mockRequestListener,
+                { urls: ["<all_urls>"] },
+                ["blocking"]
+            );
+            console.log("Mock Server listener attached.");
+        } else {
+            console.log("Mock Server listener removed (disabled).");
+        }
+    }
+}
+
+
+// --- Traffic Capture Logic ---
+
+const trafficLog = [];
+const MAX_TRAFFIC_LOG = 20;
+
+const trafficListener = (details) => {
+    // Basic filter: only capture http(s)
+    if (!details.url.startsWith('http')) return;
+
+    // Capture Body if available
+    let requestBody = null;
+    if (details.requestBody) {
+        if (details.requestBody.raw && details.requestBody.raw.length > 0) {
+            try {
+                // Decode array buffer
+                const decoder = new TextDecoder("utf-8");
+                requestBody = decoder.decode(details.requestBody.raw[0].bytes);
+            } catch (e) {
+                requestBody = "[Binary or undecodable data]";
+            }
+        } else if (details.requestBody.formData) {
+            requestBody = JSON.stringify(details.requestBody.formData);
+        }
+    }
+
+    const logEntry = {
+        id: details.requestId,
+        method: details.method,
+        url: details.url,
+        type: details.type,
+        timeStamp: Date.now(),
+        requestBody: requestBody
+    };
+
+    // Circular buffer
+    trafficLog.push(logEntry);
+    if (trafficLog.length > MAX_TRAFFIC_LOG) {
+        trafficLog.shift();
+    }
+};
+
+function initializeTrafficListener() {
+    if (chrome.webRequest && chrome.webRequest.onBeforeRequest) {
+        // Remove existing first
+        if (chrome.webRequest.onBeforeRequest.hasListener(trafficListener)) {
+             chrome.webRequest.onBeforeRequest.removeListener(trafficListener);
+        }
+
+        // Add new listener (non-blocking)
+        chrome.webRequest.onBeforeRequest.addListener(
+            trafficListener,
+            { urls: ["<all_urls>"] },
+            ["requestBody"]
+        );
+
+        // Add response listener for status codes
+        if (chrome.webRequest.onCompleted.hasListener(trafficResponseListener)) {
+            chrome.webRequest.onCompleted.removeListener(trafficResponseListener);
+        }
+        chrome.webRequest.onCompleted.addListener(
+            trafficResponseListener,
+            { urls: ["<all_urls>"] },
+            ["responseHeaders"]
+        );
+
+        console.log("Traffic Monitor listeners attached.");
+    }
+}
+
+const trafficResponseListener = (details) => {
+    // Find matching request in log
+    const entry = trafficLog.find(e => e.id === details.requestId);
+    if (entry) {
+        entry.statusCode = details.statusCode;
+        entry.statusLine = details.statusLine;
+        // Could capture headers if needed, but keeping it light
+    }
+};
+
 // Initialize on startup
 initializeListeners();
-
 
 // Clear findings on navigation
 chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
