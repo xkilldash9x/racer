@@ -432,7 +432,26 @@ async function loadMockSettings() {
     try {
         const data = await getStorageData(["serverMode", "mockRules"]);
         serverModeEnabled = data.serverMode === true;
-        mockRules = data.mockRules || [];
+        const rules = data.mockRules || [];
+
+        // Pre-compile regexes for performance
+        // Optimization: Compile regex once when rules are loaded, instead of on every request
+        mockRules = rules.map(rule => {
+             try {
+                // Correct wildcard handling: escape everything EXCEPT the * which we treat as .*
+                // We split by * first, escape each part, then join with .*
+                const parts = rule.urlPattern.split('*');
+                const escapedParts = parts.map(part => part.replace(/[.+?^${}()|[\]\\]/g, '\\$&'));
+                const regexPattern = escapedParts.join('.*');
+
+                // Store compiled regex on the rule object
+                return { ...rule, _compiledRegex: new RegExp(`^${regexPattern}$`) };
+             } catch (e) {
+                 console.error("Error compiling mock rule regex:", e);
+                 return rule; // Return rule without regex (will fail safely)
+             }
+        });
+
     } catch (e) {
         console.error("Error loading mock settings", e);
     }
@@ -455,16 +474,9 @@ const mockRequestListener = (details) => {
     if (!serverModeEnabled || mockRules.length === 0) return;
 
     for (const rule of mockRules) {
-        // Simple wildcard matching (convert glob to regex)
+        // Use pre-compiled regex
         try {
-            // Correct wildcard handling: escape everything EXCEPT the * which we treat as .*
-            // We split by * first, escape each part, then join with .*
-            const parts = rule.urlPattern.split('*');
-            const escapedParts = parts.map(part => part.replace(/[.+?^${}()|[\]\\]/g, '\\$&'));
-            const regexPattern = escapedParts.join('.*');
-            const regex = new RegExp(`^${regexPattern}$`);
-
-            if (regex.test(details.url)) {
+            if (rule._compiledRegex && rule._compiledRegex.test(details.url)) {
                 console.log(`[Mock Server] Intercepting ${details.url} with rule: ${rule.urlPattern}`);
 
                 // Construct Data URI (with Unicode support)
